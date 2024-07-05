@@ -1,16 +1,15 @@
 package main
 
 import (
-    "github.com/nedik/spp-lobby/routes"
+	"github.com/nedik/spp-lobby/routes"
 
-    "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
-    router := gin.Default()
+	router := gin.Default()
 
-    routes.InitServerRoutes(router)
+	routes.InitServerRoutes(router)
 
-    router.Run()
+	router.Run()
 }
-
