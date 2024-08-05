@@ -18,52 +18,61 @@ type InvalidInput struct {
 	SomeValue string `json:"some_value"`
 }
 
-func setupRouter() *gin.Engine {
-	router := gin.Default()
-	routes.InitServerRoutes(router)
-	return router
+type TestEnvironment struct {
+    HTTPRecorder *httptest.ResponseRecorder
+    Context *gin.Context
+    Router *gin.Engine
+
+}
+
+func setupRouter() TestEnvironment {
+    var testEnvironment TestEnvironment
+    testEnvironment.HTTPRecorder = httptest.NewRecorder()
+    testEnvironment.Context, testEnvironment.Router = gin.CreateTestContext(testEnvironment.HTTPRecorder)
+	routes.InitServerRoutes(testEnvironment.Router)
+	return testEnvironment
 }
 
 func TestGetServersEmptyList(t *testing.T) {
-	router := setupRouter()
-	getServersAndAssert(t, router, []types.Server{})
+	testEnvironment := setupRouter()
+	getServersAndAssert(t, testEnvironment, []types.Server{})
 }
 
 func TestRegisterNewServer(t *testing.T) {
-	router := setupRouter()
+	testEnvironment := setupRouter()
 
-	registeredServer := registerServerAndAssert(t, router, 23073, "Test Server")
+	registeredServer := registerServerAndAssert(t, testEnvironment, 23073, "Test Server")
 
-	getServersAndAssert(t, router, []types.Server{registeredServer})
+	getServersAndAssert(t, testEnvironment, []types.Server{registeredServer})
 }
 
 func TestRegisterNewServerTwice(t *testing.T) {
-	router := setupRouter()
+	testEnvironment := setupRouter()
 
-	registerServerAndAssert(t, router, 23073, "Test Server")
-	registeredServer := registerServerAndAssert(t, router, 23073, "Test Server")
+	registerServerAndAssert(t, testEnvironment, 23073, "Test Server")
+	registeredServer := registerServerAndAssert(t, testEnvironment, 23073, "Test Server")
 
-	getServersAndAssert(t, router, []types.Server{registeredServer})
+	getServersAndAssert(t, testEnvironment, []types.Server{registeredServer})
 }
 
 func TestRegisterTwoNewServers(t *testing.T) {
-	router := setupRouter()
+	testEnvironment := setupRouter()
 
-	registeredServer1 := registerServerAndAssert(t, router, 23073, "Test Server")
-	registeredServer2 := registerServerAndAssert(t, router, 23074, "Test Server 2")
+	registeredServer1 := registerServerAndAssert(t, testEnvironment, 23073, "Test Server")
+	registeredServer2 := registerServerAndAssert(t, testEnvironment, 23074, "Test Server 2")
 
-	getServersAndAssert(t, router, []types.Server{registeredServer1, registeredServer2})
+	getServersAndAssert(t, testEnvironment, []types.Server{registeredServer1, registeredServer2})
 }
 
 func TestRegisterTwoNewServersTwice(t *testing.T) {
-	router := setupRouter()
+	testEnvironment := setupRouter()
 
-	registeredServer1 := registerServerAndAssert(t, router, 23073, "Test Server")
-	registeredServer2 := registerServerAndAssert(t, router, 23074, "Test Server 2")
-	registerServerAndAssert(t, router, 23073, "Test Server")
-	registerServerAndAssert(t, router, 23074, "Test Server 2")
+	registeredServer1 := registerServerAndAssert(t, testEnvironment, 23073, "Test Server")
+	registeredServer2 := registerServerAndAssert(t, testEnvironment, 23074, "Test Server 2")
+	registerServerAndAssert(t, testEnvironment, 23073, "Test Server")
+	registerServerAndAssert(t, testEnvironment, 23074, "Test Server 2")
 
-	getServersAndAssert(t, router, []types.Server{registeredServer1, registeredServer2})
+	getServersAndAssert(t, testEnvironment, []types.Server{registeredServer1, registeredServer2})
 }
 
 func TestMissingFieldsOnRegisteringNewServer(t *testing.T) {
@@ -184,10 +193,10 @@ func createLongString(size int) string {
 	return result
 }
 
-func registerServerAndAssert(t *testing.T, router *gin.Engine, port uint16, name string) types.Server {
+func registerServerAndAssert(t *testing.T, env TestEnvironment, port uint16, name string) types.Server {
 	registerServerInput := createRegisterServerInput(port, name)
 	serverJson, _ := json.Marshal(registerServerInput)
-	returnedCode, _ := sendJsonToPostEndpoint(router, "/servers", serverJson)
+	returnedCode, _ := sendJsonToPostEndpoint(env, "/servers", serverJson)
 	assert.Equal(t, http.StatusCreated, returnedCode)
 
 	registeredServer := types.ConvertRegisterServerInputToServer(registerServerInput)
@@ -220,23 +229,24 @@ func createRegisterServerInput(port uint16, name string) types.RegisterServerInp
 	return registerServerInput
 }
 
-func getServersAndAssert(t *testing.T, router *gin.Engine, expected_servers []types.Server) {
-	code, body := getServers(router)
+func getServersAndAssert(t *testing.T, env TestEnvironment, expected_servers []types.Server) {
+	code, body := getServers(env)
 	assert.Equal(t, http.StatusOK, code)
 	expected_servers_json, _ := json.Marshal(expected_servers)
 	assert.Equal(t, string(expected_servers_json), body)
 }
 
-func getServers(router *gin.Engine) (int, string) {
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/servers", nil)
-	router.ServeHTTP(w, req)
-	return w.Code, w.Body.String()
+func getServers(env TestEnvironment) (int, string) {
+	env.Context.Request, _ = http.NewRequest("GET", "/servers", nil)
+    httpRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(httpRecorder, env.Context.Request)
+	return httpRecorder.Code, httpRecorder.Body.String()
 }
 
-func sendJsonToPostEndpoint(router *gin.Engine, endpoint string, dataJson []byte) (int, string) {
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("POST", endpoint, strings.NewReader(string(dataJson)))
-	router.ServeHTTP(w, req)
-	return w.Code, w.Body.String()
+func sendJsonToPostEndpoint(env TestEnvironment, endpoint string, dataJson []byte) (int, string) {
+	env.Context.Request, _ = http.NewRequest("POST", endpoint, strings.NewReader(string(dataJson)))
+    httpRecorder := httptest.NewRecorder()
+	env.Router.ServeHTTP(httpRecorder, env.Context.Request)
+	return httpRecorder.Code, httpRecorder.Body.String()
 }
+
