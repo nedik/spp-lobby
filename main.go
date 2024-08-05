@@ -10,6 +10,7 @@ func main() {
 	router := gin.Default()
 
 	routes.InitServerRoutes(router)
+    routes.InitFaviconRoutes(router)
 
 	router.Run()
 }
