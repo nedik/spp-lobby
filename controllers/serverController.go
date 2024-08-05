@@ -1,19 +1,34 @@
 package controllers
 
 import (
-    "errors"
-    "strconv"
-    "net/http"
+	"errors"
+	"net/http"
+	"strconv"
+	"time"
 
-    "github.com/nedik/spp-lobby/types"
+	"github.com/nedik/spp-lobby/types"
 
-    "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
+	"github.com/igrmk/treemap/v2"
 )
 
-var servers = []types.Server{}
+type TServersByExpiry = *treemap.TreeMap[int64, []types.Server]
+
+var serversByExpiry = treemap.New[int64, []types.Server]()
+var serversByIPPort = make(map[string]types.Server)
+
+func treeToList(serversTree TServersByExpiry) []types.Server {
+    serversList := []types.Server{}
+    for it := serversTree.Iterator(); it.Valid(); it.Next() {
+        for _, currentServer := range it.Value() {
+            serversList = append(serversList, currentServer)
+        }
+    }
+    return serversList
+}
 
 func ListAllServers(c *gin.Context) {
-    c.JSON(http.StatusOK, servers)
+    c.JSON(http.StatusOK, treeToList(serversByExpiry))
 }
 
 func RegisterServer(c *gin.Context) {
@@ -33,18 +48,19 @@ func RegisterServer(c *gin.Context) {
     incomingServerPort := registerServerInput.Port
     incomingServer := types.ConvertRegisterServerInputToServer(registerServerInput)
     incomingServer.IP = incomingServerIP
+    incomingServerIPPort := convertToIPPort(incomingServerIP, incomingServerPort)
 
     // Find and update duplicate if exists
-    for i, server := range servers {
-        if server.IP == incomingServerIP && server.Port == incomingServerPort {
-            servers[i] = incomingServer
-            c.JSON(http.StatusCreated, gin.H{})
-            return
-        }
+    _, serverFound := serversByIPPort[incomingServerIPPort]
+    if serverFound {
+        // TODO: update expiry
+        c.JSON(http.StatusCreated, gin.H{})
+        return
     }
 
     // If doesn't exist, then add a new one
-    servers = append(servers, incomingServer)
+    appendToServersTree(serversByExpiry, incomingServer)
+    serversByIPPort[incomingServerIPPort] = incomingServer
     c.JSON(http.StatusCreated, gin.H{})
 }
 
@@ -93,12 +109,28 @@ func getPortFromParams(c *gin.Context) (uint16, error) {
 }
 
 func findServer(ip string, port uint16) (*types.Server, error) {
-    for _, candidateServer := range servers {
-        if candidateServer.IP == ip && candidateServer.Port == port {
-            return &candidateServer, nil
-        }
+    serverIPPort := convertToIPPort(ip, port)
+    candidateServer, serverFound := serversByIPPort[serverIPPort]
+    if serverFound {
+        return &candidateServer, nil
     }
 
     return nil, errors.New("server not found")
+}
+
+func convertToIPPort(ip string, port uint16) string {
+    return ip + ":" + strconv.FormatUint(uint64(port), 10)
+}
+
+func appendToServersTree(serversTree TServersByExpiry, newServer types.Server) {
+    timeNow := time.Now().Unix()
+    serverListNow, found := serversTree.Get(timeNow)
+    if found {
+        serverListNowUpdated := append(serverListNow, newServer)
+        serversTree.Del(timeNow)
+        serversTree.Set(timeNow, serverListNowUpdated)
+    } else {
+        serversTree.Set(timeNow, []types.Server{newServer})
+    }
 }
 
