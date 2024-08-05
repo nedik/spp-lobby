@@ -49,11 +49,16 @@ func RegisterServer(c *gin.Context) {
     incomingServer := types.ConvertRegisterServerInputToServer(registerServerInput)
     incomingServer.IP = incomingServerIP
     incomingServerIPPort := convertToIPPort(incomingServerIP, incomingServerPort)
+    incomingServer.UpdatedAt = time.Now().Unix()
 
     // Find and update duplicate if exists
-    _, serverFound := serversByIPPort[incomingServerIPPort]
+    foundServer, serverFound := serversByIPPort[incomingServerIPPort]
     if serverFound {
-        // TODO: update expiry
+        updateInServersTree(serversByUpdatedTime, foundServer, incomingServer.UpdatedAt)
+        serverByIPPort := serversByIPPort[incomingServerIPPort]
+        serverByIPPort.UpdatedAt = incomingServer.UpdatedAt
+        serversByIPPort[incomingServerIPPort] = serverByIPPort
+
         c.JSON(http.StatusCreated, gin.H{})
         return
     }
@@ -123,14 +128,43 @@ func convertToIPPort(ip string, port uint16) string {
 }
 
 func appendToServersTree(serversTree TServersByUpdatedTime, newServer types.Server) {
-    timeNow := time.Now().Unix()
-    serverListNow, found := serversTree.Get(timeNow)
+    serverListNow, found := serversTree.Get(newServer.UpdatedAt)
     if found {
         serverListNowUpdated := append(serverListNow, newServer)
-        serversTree.Del(timeNow)
-        serversTree.Set(timeNow, serverListNowUpdated)
+        serversTree.Del(newServer.UpdatedAt)
+        serversTree.Set(newServer.UpdatedAt, serverListNowUpdated)
     } else {
-        serversTree.Set(timeNow, []types.Server{newServer})
+        serversTree.Set(newServer.UpdatedAt, []types.Server{newServer})
     }
+}
+
+func updateInServersTree(serversTree TServersByUpdatedTime, server types.Server, newUpdateTime int64) {
+    lastUpdatedAt := server.UpdatedAt
+    serversListAtTime, found := serversByUpdatedTime.Get(lastUpdatedAt)
+    if found {
+        // Find the server in the list
+        var serverIndex *int = nil
+        for index, currentServer := range serversListAtTime {
+            if currentServer.IP == server.IP && currentServer.Port == server.Port {
+                serverIndex = new(int)
+                *serverIndex = index
+                break
+            }
+        }
+
+        if serverIndex != nil {
+            // Remove server from the list
+            lastIndex := len(serversListAtTime) - 1
+            serversListAtTime[*serverIndex] = serversListAtTime[lastIndex]
+            serversListAtTime = serversListAtTime[:lastIndex]
+
+            // Remove current list and put back  on the tree without the server
+            serversByUpdatedTime.Del(lastUpdatedAt)
+            serversByUpdatedTime.Set(lastUpdatedAt, serversListAtTime)
+        }
+    }
+
+    server.UpdatedAt = newUpdateTime
+    appendToServersTree(serversTree, server)
 }
 

@@ -21,5 +21,6 @@ type Server struct {
     Survival        bool        `json:"survival"`
     Version         string      `json:"version"`
     WM              bool        `json:"wm"`
+    UpdatedAt       int64       `json:"-"`
 }
 
