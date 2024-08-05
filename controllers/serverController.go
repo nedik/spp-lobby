@@ -13,6 +13,9 @@ import (
 )
 
 type TServersByUpdatedTime = *treemap.TreeMap[int64, []types.Server]
+type TServersByIPPort = map[string]types.Server
+
+const SERVER_EXPIRY_TIME_IN_SECONDS = 5 * 60 // 5 minutes
 
 var serversByUpdatedTime = treemap.New[int64, []types.Server]()
 var serversByIPPort = make(map[string]types.Server)
@@ -28,6 +31,7 @@ func treeToList(serversTree TServersByUpdatedTime) []types.Server {
 }
 
 func ListAllServers(c *gin.Context) {
+    removeExpiredServers(serversByUpdatedTime, serversByIPPort)
     c.JSON(http.StatusOK, treeToList(serversByUpdatedTime))
 }
 
@@ -70,6 +74,7 @@ func RegisterServer(c *gin.Context) {
 }
 
 func GetSpecificServer(c *gin.Context) {
+    removeExpiredServers(serversByUpdatedTime, serversByIPPort)
     ip := c.Param("ip")
     port, err := getPortFromParams(c)
     if err != nil {
@@ -87,6 +92,7 @@ func GetSpecificServer(c *gin.Context) {
 }
 
 func GetPlayersOfServer(c *gin.Context) {
+    removeExpiredServers(serversByUpdatedTime, serversByIPPort)
     ip := c.Param("ip")
     port, err := getPortFromParams(c)
     if err != nil {
@@ -166,5 +172,23 @@ func updateInServersTree(serversTree TServersByUpdatedTime, server types.Server,
 
     server.UpdatedAt = newUpdateTime
     appendToServersTree(serversTree, server)
+}
+
+func removeExpiredServers(serversTree TServersByUpdatedTime, serversMap TServersByIPPort) {
+    timeNow := time.Now().Unix()
+    serversTreeKeysToDelete := []int64{}
+    for it := serversTree.Iterator(); it.Valid(); it.Next() {
+        if timeNow - it.Key() > SERVER_EXPIRY_TIME_IN_SECONDS {
+            for _, currentServer := range it.Value() {
+                serverIPPort := convertToIPPort(currentServer.IP, currentServer.Port)
+                delete(serversMap, serverIPPort)
+            }
+            serversTreeKeysToDelete = append(serversTreeKeysToDelete, it.Key())
+        }
+    }
+
+    for _, serversTreeKeyToDelete := range serversTreeKeysToDelete {
+        serversTree.Del(serversTreeKeyToDelete)
+    }
 }
 
