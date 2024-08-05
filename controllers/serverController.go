@@ -12,12 +12,12 @@ import (
 	"github.com/igrmk/treemap/v2"
 )
 
-type TServersByExpiry = *treemap.TreeMap[int64, []types.Server]
+type TServersByUpdatedTime = *treemap.TreeMap[int64, []types.Server]
 
-var serversByExpiry = treemap.New[int64, []types.Server]()
+var serversByUpdatedTime = treemap.New[int64, []types.Server]()
 var serversByIPPort = make(map[string]types.Server)
 
-func treeToList(serversTree TServersByExpiry) []types.Server {
+func treeToList(serversTree TServersByUpdatedTime) []types.Server {
     serversList := []types.Server{}
     for it := serversTree.Iterator(); it.Valid(); it.Next() {
         for _, currentServer := range it.Value() {
@@ -28,7 +28,7 @@ func treeToList(serversTree TServersByExpiry) []types.Server {
 }
 
 func ListAllServers(c *gin.Context) {
-    c.JSON(http.StatusOK, treeToList(serversByExpiry))
+    c.JSON(http.StatusOK, treeToList(serversByUpdatedTime))
 }
 
 func RegisterServer(c *gin.Context) {
@@ -59,7 +59,7 @@ func RegisterServer(c *gin.Context) {
     }
 
     // If doesn't exist, then add a new one
-    appendToServersTree(serversByExpiry, incomingServer)
+    appendToServersTree(serversByUpdatedTime, incomingServer)
     serversByIPPort[incomingServerIPPort] = incomingServer
     c.JSON(http.StatusCreated, gin.H{})
 }
@@ -122,7 +122,7 @@ func convertToIPPort(ip string, port uint16) string {
     return ip + ":" + strconv.FormatUint(uint64(port), 10)
 }
 
-func appendToServersTree(serversTree TServersByExpiry, newServer types.Server) {
+func appendToServersTree(serversTree TServersByUpdatedTime, newServer types.Server) {
     timeNow := time.Now().Unix()
     serverListNow, found := serversTree.Get(timeNow)
     if found {
