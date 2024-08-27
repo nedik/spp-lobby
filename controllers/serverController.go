@@ -17,8 +17,17 @@ type TServersByIPPort = map[string]types.Server
 
 const SERVER_EXPIRY_TIME_IN_SECONDS = 5 * 60 // 5 minutes
 
-var serversByUpdatedTime = treemap.New[int64, []types.Server]()
-var serversByIPPort = make(map[string]types.Server)
+type ServerController struct {
+    serversByUpdatedTime TServersByUpdatedTime
+    serversByIPPort TServersByIPPort
+}
+
+func NewServerController() ServerController {
+    return ServerController{
+        serversByUpdatedTime: treemap.New[int64,  []types.Server](),
+        serversByIPPort: make(map[string]types.Server),
+    }
+}
 
 func treeToList(serversTree TServersByUpdatedTime) []types.Server {
     serversList := []types.Server{}
@@ -30,12 +39,12 @@ func treeToList(serversTree TServersByUpdatedTime) []types.Server {
     return serversList
 }
 
-func ListAllServers(c *gin.Context) {
-    removeExpiredServers(serversByUpdatedTime, serversByIPPort)
-    c.JSON(http.StatusOK, treeToList(serversByUpdatedTime))
+func (self *ServerController) ListAllServers(c *gin.Context) {
+    removeExpiredServers(self.serversByUpdatedTime, self.serversByIPPort)
+    c.JSON(http.StatusOK, treeToList(self.serversByUpdatedTime))
 }
 
-func RegisterServer(c *gin.Context) {
+func (self *ServerController) RegisterServer(c *gin.Context) {
     var registerServerInput types.RegisterServerInput
 
     if err := c.BindJSON(&registerServerInput); err != nil {
@@ -56,25 +65,25 @@ func RegisterServer(c *gin.Context) {
     incomingServer.UpdatedAt = time.Now().Unix()
 
     // Find and update duplicate if exists
-    foundServer, serverFound := serversByIPPort[incomingServerIPPort]
+    foundServer, serverFound := self.serversByIPPort[incomingServerIPPort]
     if serverFound {
-        updateInServersTree(serversByUpdatedTime, foundServer, incomingServer.UpdatedAt)
-        serverByIPPort := serversByIPPort[incomingServerIPPort]
+        self.updateInServersTree(self.serversByUpdatedTime, foundServer, incomingServer.UpdatedAt)
+        serverByIPPort := self.serversByIPPort[incomingServerIPPort]
         serverByIPPort.UpdatedAt = incomingServer.UpdatedAt
-        serversByIPPort[incomingServerIPPort] = serverByIPPort
+        self.serversByIPPort[incomingServerIPPort] = serverByIPPort
 
         c.JSON(http.StatusCreated, gin.H{})
         return
     }
 
     // If doesn't exist, then add a new one
-    appendToServersTree(serversByUpdatedTime, incomingServer)
-    serversByIPPort[incomingServerIPPort] = incomingServer
+    appendToServersTree(self.serversByUpdatedTime, incomingServer)
+    self.serversByIPPort[incomingServerIPPort] = incomingServer
     c.JSON(http.StatusCreated, gin.H{})
 }
 
-func GetSpecificServer(c *gin.Context) {
-    removeExpiredServers(serversByUpdatedTime, serversByIPPort)
+func (self *ServerController) GetSpecificServer(c *gin.Context) {
+    removeExpiredServers(self.serversByUpdatedTime, self.serversByIPPort)
     ip := c.Param("ip")
     port, err := getPortFromParams(c)
     if err != nil {
@@ -82,7 +91,7 @@ func GetSpecificServer(c *gin.Context) {
         return
     }
 
-    foundServer, err := findServer(ip, port)
+    foundServer, err := self.findServer(ip, port)
     if err != nil {
         c.JSON(http.StatusNotFound, gin.H{"message": err.Error()})
         return
@@ -91,8 +100,8 @@ func GetSpecificServer(c *gin.Context) {
     c.JSON(http.StatusNotFound, foundServer)
 }
 
-func GetPlayersOfServer(c *gin.Context) {
-    removeExpiredServers(serversByUpdatedTime, serversByIPPort)
+func (self *ServerController) GetPlayersOfServer(c *gin.Context) {
+    removeExpiredServers(self.serversByUpdatedTime, self.serversByIPPort)
     ip := c.Param("ip")
     port, err := getPortFromParams(c)
     if err != nil {
@@ -100,7 +109,7 @@ func GetPlayersOfServer(c *gin.Context) {
         return
     }
 
-    foundServer, err := findServer(ip, port)
+    foundServer, err := self.findServer(ip, port)
     if err != nil {
         c.JSON(http.StatusNotFound, gin.H{"message": err.Error()})
         return
@@ -119,9 +128,9 @@ func getPortFromParams(c *gin.Context) (uint16, error) {
     return port, nil
 }
 
-func findServer(ip string, port uint16) (*types.Server, error) {
+func (self *ServerController) findServer(ip string, port uint16) (*types.Server, error) {
     serverIPPort := convertToIPPort(ip, port)
-    candidateServer, serverFound := serversByIPPort[serverIPPort]
+    candidateServer, serverFound := self.serversByIPPort[serverIPPort]
     if serverFound {
         return &candidateServer, nil
     }
@@ -144,9 +153,9 @@ func appendToServersTree(serversTree TServersByUpdatedTime, newServer types.Serv
     }
 }
 
-func updateInServersTree(serversTree TServersByUpdatedTime, server types.Server, newUpdateTime int64) {
+func (self *ServerController) updateInServersTree(serversTree TServersByUpdatedTime, server types.Server, newUpdateTime int64) {
     lastUpdatedAt := server.UpdatedAt
-    serversListAtTime, found := serversByUpdatedTime.Get(lastUpdatedAt)
+    serversListAtTime, found := self.serversByUpdatedTime.Get(lastUpdatedAt)
     if found {
         // Find the server in the list
         var serverIndex *int = nil
@@ -165,8 +174,8 @@ func updateInServersTree(serversTree TServersByUpdatedTime, server types.Server,
             serversListAtTime = serversListAtTime[:lastIndex]
 
             // Remove current list and put back  on the tree without the server
-            serversByUpdatedTime.Del(lastUpdatedAt)
-            serversByUpdatedTime.Set(lastUpdatedAt, serversListAtTime)
+            self.serversByUpdatedTime.Del(lastUpdatedAt)
+            self.serversByUpdatedTime.Set(lastUpdatedAt, serversListAtTime)
         }
     }
 

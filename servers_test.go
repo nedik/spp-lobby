@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nedik/spp-lobby/controllers"
 	"github.com/nedik/spp-lobby/routes"
 	"github.com/nedik/spp-lobby/types"
 
@@ -22,14 +23,18 @@ type TestEnvironment struct {
     HTTPRecorder *httptest.ResponseRecorder
     Context *gin.Context
     Router *gin.Engine
-
 }
 
 func setupRouter() TestEnvironment {
     var testEnvironment TestEnvironment
     testEnvironment.HTTPRecorder = httptest.NewRecorder()
     testEnvironment.Context, testEnvironment.Router = gin.CreateTestContext(testEnvironment.HTTPRecorder)
-	routes.InitServerRoutes(testEnvironment.Router)
+
+    serverController := controllers.NewServerController()
+    serverRouteController := routes.NewServerRouteController(serverController)
+    routerGroup := testEnvironment.Router.Group("/")
+
+    serverRouteController.InitServerRoutes(routerGroup)
 	return testEnvironment
 }
 
