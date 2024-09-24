@@ -55,26 +55,48 @@ func main() {
 }
 
 func createRegisterServerInput(port uint16, name string) types.RegisterServerInput {
+    advanced := new(bool)
+    antiCheatOn := new(bool)
+    bonusFrequency := new(uint16)
+    country := new(string)
+    info := new(string)
+    numBots := new(uint16)
+    private := new(bool)
+    realistic := new(bool)
+    respawn := new(uint32)
+    survival := new(bool)
+    wm := new(bool)
+    *advanced = false
+    *antiCheatOn = false
+    *bonusFrequency = 0
+    *country = ""
+    *info = ""
+    *numBots = 0
+    *private = false
+    *realistic = false
+    *respawn = 0
+    *survival = false
+    *wm = false
 	registerServerInput := types.RegisterServerInput{
-		Advanced:       true,
-		AntiCheatOn:    true,
-		BonusFrequency: 10,
-		Country:        "PL",
+		Advanced:       advanced,
+		AntiCheatOn:    antiCheatOn,
+		BonusFrequency: bonusFrequency,
+		Country:        country,
 		CurrentMap:     "ctf_Ash",
 		GameStyle:      "CTF",
-		Info:           "Test Server Info",
+		Info:           info,
 		MaxPlayers:     32,
 		Name:           name,
-		NumBots:        1,
+		NumBots:        numBots,
 		OS:             "Linux",
-		Players:        []string{"test_player_1", "another player"},
+		Players:        []string{},
 		Port:           port,
-		Private:        true,
-		Realistic:      true,
-		Respawn:        1,
-		Survival:       true,
+		Private:        private,
+		Realistic:      realistic,
+		Respawn:        respawn,
+		Survival:       survival,
 		Version:        "1.0",
-		WM:             true,
+		WM:             wm,
 	}
 
 	return registerServerInput

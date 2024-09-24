@@ -47,7 +47,7 @@ func (self *ServerController) ListAllServers(c *gin.Context) {
 func (self *ServerController) RegisterServer(c *gin.Context) {
     var registerServerInput types.RegisterServerInput
 
-    if err := c.BindJSON(&registerServerInput); err != nil {
+    if err := c.ShouldBindJSON(&registerServerInput); err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid input"})
         return
     }

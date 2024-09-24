@@ -20,21 +20,21 @@ type InvalidInput struct {
 }
 
 type TestEnvironment struct {
-    HTTPRecorder *httptest.ResponseRecorder
-    Context *gin.Context
-    Router *gin.Engine
+	HTTPRecorder *httptest.ResponseRecorder
+	Context      *gin.Context
+	Router       *gin.Engine
 }
 
 func setupRouter() TestEnvironment {
-    var testEnvironment TestEnvironment
-    testEnvironment.HTTPRecorder = httptest.NewRecorder()
-    testEnvironment.Context, testEnvironment.Router = gin.CreateTestContext(testEnvironment.HTTPRecorder)
+	var testEnvironment TestEnvironment
+	testEnvironment.HTTPRecorder = httptest.NewRecorder()
+	testEnvironment.Context, testEnvironment.Router = gin.CreateTestContext(testEnvironment.HTTPRecorder)
 
-    serverController := controllers.NewServerController()
-    serverRouteController := routes.NewServerRouteController(serverController)
-    routerGroup := testEnvironment.Router.Group("/")
+	serverController := controllers.NewServerController()
+	serverRouteController := routes.NewServerRouteController(serverController)
+	routerGroup := testEnvironment.Router.Group("/")
 
-    serverRouteController.InitServerRoutes(routerGroup)
+	serverRouteController.InitServerRoutes(routerGroup)
 	return testEnvironment
 }
 
@@ -80,24 +80,96 @@ func TestRegisterTwoNewServersTwice(t *testing.T) {
 	getServersAndAssert(t, testEnvironment, []types.Server{registeredServer1, registeredServer2})
 }
 
+func TestFieldsWithDefaultValuesOnRegisteringNewServer(t *testing.T) {
+	router := setupRouter()
+
+    advanced := new(bool)
+    antiCheatOn := new(bool)
+    bonusFrequency := new(uint16)
+    country := new(string)
+    info := new(string)
+    numBots := new(uint16)
+    private := new(bool)
+    realistic := new(bool)
+    respawn := new(uint32)
+    survival := new(bool)
+    wm := new(bool)
+    *advanced = false
+    *antiCheatOn = false
+    *bonusFrequency = 0
+    *country = ""
+    *info = ""
+    *numBots = 0
+    *private = false
+    *realistic = false
+    *respawn = 0
+    *survival = false
+    *wm = false
+
+	registerServerInput := types.RegisterServerInput{
+		Advanced:       advanced,
+		AntiCheatOn:    antiCheatOn,
+		BonusFrequency: bonusFrequency,
+		Country:        country,
+		CurrentMap:     "ctf_Ash",
+		GameStyle:      "CTF",
+		Info:           info,
+		MaxPlayers:     10,
+		Name:           "Name",
+		NumBots:        numBots,
+		OS:             "Linux",
+		Players:        []string{},
+		Port:           23073,
+		Private:        private,
+		Realistic:      realistic,
+		Respawn:        respawn,
+		Survival:       survival,
+		Version:        "1.0",
+		WM:             wm,
+	}
+
+	invalidInputJson, _ := json.Marshal(registerServerInput)
+	returnedCode, _ := sendJsonToPostEndpoint(router, "/servers", invalidInputJson)
+	assert.Equal(t, http.StatusCreated, returnedCode)
+}
+
 func TestMissingFieldsOnRegisteringNewServer(t *testing.T) {
 	router := setupRouter()
 
+    advanced := new(bool)
+    antiCheatOn := new(bool)
+    bonusFrequency := new(uint16)
+    info := new(string)
+    numBots := new(uint16)
+    realistic := new(bool)
+    respawn := new(uint32)
+    survival := new(bool)
+    wm := new(bool)
+    *advanced = true
+    *antiCheatOn = true
+    *bonusFrequency = 10
+    *info = "Test Server Info"
+    *numBots = 1
+    *realistic = true
+    *respawn = 1
+    *survival = true
+    *wm = true
+
 	newServerInputWithMissingFields := types.RegisterServerInput{
-		Advanced:       true,
-		AntiCheatOn:    true,
-		BonusFrequency: 10,
+		Advanced:       advanced,
+		AntiCheatOn:    antiCheatOn,
+		BonusFrequency: bonusFrequency,
 		CurrentMap:     "ctf_Ash",
-		Info:           "Test Server Info",
+		Info:           info,
 		MaxPlayers:     32,
-		NumBots:        1,
+		NumBots:        numBots,
 		OS:             "Linux",
 		Port:           23073,
-		Realistic:      true,
-		Respawn:        1,
-		Survival:       true,
+		Realistic:      realistic,
+		Respawn:        respawn,
+		Survival:       survival,
 		Version:        "1.0",
-		WM:             true,
+		WM:             wm,
 	}
 
 	invalidInputJson, _ := json.Marshal(newServerInputWithMissingFields)
@@ -120,7 +192,9 @@ func TestInvalidInputOnRegisteringNewServer(t *testing.T) {
 func TestTooLongCountryOnRegisteringNewServer(t *testing.T) {
 	router := setupRouter()
 	registerServerInput := createRegisterServerInput(23073, "Test Name")
-	registerServerInput.Country = createLongString(types.MaxCountryLength + 1)
+    country := new(string)
+    *country = createLongString(types.MaxCountryLength + 1)
+	registerServerInput.Country = country
 	invalidInputJson, _ := json.Marshal(registerServerInput)
 	returnedCode, _ := sendJsonToPostEndpoint(router, "/servers", invalidInputJson)
 	assert.Equal(t, http.StatusBadRequest, returnedCode)
@@ -147,7 +221,9 @@ func TestTooLongGameStyleOnRegisteringNewServer(t *testing.T) {
 func TestTooLongInfoOnRegisteringNewServer(t *testing.T) {
 	router := setupRouter()
 	registerServerInput := createRegisterServerInput(23073, "Test Name")
-	registerServerInput.Info = createLongString(types.MaxInfoSize + 1)
+    info := new(string)
+    *info = createLongString(types.MaxInfoSize + 1)
+	registerServerInput.Info = info
 	invalidInputJson, _ := json.Marshal(registerServerInput)
 	returnedCode, _ := sendJsonToPostEndpoint(router, "/servers", invalidInputJson)
 	assert.Equal(t, http.StatusBadRequest, returnedCode)
@@ -209,26 +285,49 @@ func registerServerAndAssert(t *testing.T, env TestEnvironment, port uint16, nam
 }
 
 func createRegisterServerInput(port uint16, name string) types.RegisterServerInput {
+    advanced := new(bool)
+    antiCheatOn := new(bool)
+    bonusFrequency := new(uint16)
+    country := new(string)
+    info := new(string)
+    numBots := new(uint16)
+    private := new(bool)
+    realistic := new(bool)
+    respawn := new(uint32)
+    survival := new(bool)
+    wm := new(bool)
+    *advanced = true
+    *antiCheatOn = true
+    *bonusFrequency = 10
+    *country = "PL"
+    *info = "Test Server Info"
+    *numBots = 1
+    *private = true
+    *realistic = true
+    *respawn = 1
+    *survival = true
+    *wm = true
+
 	registerServerInput := types.RegisterServerInput{
-		Advanced:       true,
-		AntiCheatOn:    true,
-		BonusFrequency: 10,
-		Country:        "PL",
+		Advanced:       advanced,
+		AntiCheatOn:    antiCheatOn,
+		BonusFrequency: bonusFrequency,
+		Country:        country,
 		CurrentMap:     "ctf_Ash",
 		GameStyle:      "CTF",
-		Info:           "Test Server Info",
+		Info:           info,
 		MaxPlayers:     32,
 		Name:           name,
-		NumBots:        1,
+		NumBots:        numBots,
 		OS:             "Linux",
 		Players:        []string{"test_player_1", "another player"},
 		Port:           port,
-		Private:        true,
-		Realistic:      true,
-		Respawn:        1,
-		Survival:       true,
+		Private:        private,
+		Realistic:      realistic,
+		Respawn:        respawn,
+		Survival:       survival,
 		Version:        "1.0",
-		WM:             true,
+		WM:             wm,
 	}
 
 	return registerServerInput
@@ -243,15 +342,14 @@ func getServersAndAssert(t *testing.T, env TestEnvironment, expected_servers []t
 
 func getServers(env TestEnvironment) (int, string) {
 	env.Context.Request, _ = http.NewRequest("GET", "/servers", nil)
-    httpRecorder := httptest.NewRecorder()
+	httpRecorder := httptest.NewRecorder()
 	env.Router.ServeHTTP(httpRecorder, env.Context.Request)
 	return httpRecorder.Code, httpRecorder.Body.String()
 }
 
 func sendJsonToPostEndpoint(env TestEnvironment, endpoint string, dataJson []byte) (int, string) {
 	env.Context.Request, _ = http.NewRequest("POST", endpoint, strings.NewReader(string(dataJson)))
-    httpRecorder := httptest.NewRecorder()
+	httpRecorder := httptest.NewRecorder()
 	env.Router.ServeHTTP(httpRecorder, env.Context.Request)
 	return httpRecorder.Code, httpRecorder.Body.String()
 }
-
