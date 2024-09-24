@@ -67,10 +67,8 @@ func (self *ServerController) RegisterServer(c *gin.Context) {
     // Find and update duplicate if exists
     foundServer, serverFound := self.serversByIPPort[incomingServerIPPort]
     if serverFound {
-        self.updateInServersTree(self.serversByUpdatedTime, foundServer, incomingServer.UpdatedAt)
-        serverByIPPort := self.serversByIPPort[incomingServerIPPort]
-        serverByIPPort.UpdatedAt = incomingServer.UpdatedAt
-        self.serversByIPPort[incomingServerIPPort] = serverByIPPort
+        self.updateInServersTree(foundServer, incomingServer)
+        self.serversByIPPort[incomingServerIPPort] = incomingServer
 
         c.JSON(http.StatusCreated, gin.H{})
         return
@@ -153,14 +151,16 @@ func appendToServersTree(serversTree TServersByUpdatedTime, newServer types.Serv
     }
 }
 
-func (self *ServerController) updateInServersTree(serversTree TServersByUpdatedTime, server types.Server, newUpdateTime int64) {
-    lastUpdatedAt := server.UpdatedAt
+func (self *ServerController) updateInServersTree(existingServer types.Server, updatedServer types.Server) {
+    lastUpdatedAt := existingServer.UpdatedAt
     serversListAtTime, found := self.serversByUpdatedTime.Get(lastUpdatedAt)
+
+    // Find server and remove it from the tree
     if found {
         // Find the server in the list
         var serverIndex *int = nil
         for index, currentServer := range serversListAtTime {
-            if currentServer.IP == server.IP && currentServer.Port == server.Port {
+            if currentServer.IP == existingServer.IP && currentServer.Port == existingServer.Port {
                 serverIndex = new(int)
                 *serverIndex = index
                 break
@@ -179,8 +179,8 @@ func (self *ServerController) updateInServersTree(serversTree TServersByUpdatedT
         }
     }
 
-    server.UpdatedAt = newUpdateTime
-    appendToServersTree(serversTree, server)
+    // Add the server again to the tree
+    appendToServersTree(self.serversByUpdatedTime, updatedServer)
 }
 
 func removeExpiredServers(serversTree TServersByUpdatedTime, serversMap TServersByIPPort) {
